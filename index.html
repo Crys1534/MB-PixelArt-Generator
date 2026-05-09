@@ -120,7 +120,6 @@
   let dynamicPalette = [];
   const sSize = 16; 
 
-  // Automatically load the local spritesheet
   imgSheet.src = 'blocks.png'; 
 
   imgSheet.onload = function() {
@@ -160,12 +159,10 @@
     sheetStatus.style.color = '#ff6b6b';
   };
 
-  // SCROLL FUNCTIONALITY ON THE SLIDER
   resolutionSlider.addEventListener('wheel', function(e) {
-    e.preventDefault(); // Prevents page scroll when scrolling over the slider
+    e.preventDefault(); 
     let val = parseInt(this.value);
     
-    // deltaY is negative when scrolling up (increase) and positive down (decrease)
     if (e.deltaY < 0) {
       val = Math.min(parseInt(this.max), val + 1);
     } else {
@@ -208,14 +205,41 @@
 
     for (let y = 0; y < canvas.height; y += blockSize) {
       for (let x = 0; x < canvas.width; x += blockSize) {
-        const i = (y * canvas.width + x) * 4;
-        const targetR = data[i], targetG = data[i + 1], targetB = data[i + 2], targetA = data[i + 3];
         
-        if (targetA < 128) continue; 
+        // --- NUEVA LÓGICA: Promedio de color por área de bloque ---
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+
+        // Recorremos los píxeles de la foto que caen dentro de este "chunk"
+        for (let cy = 0; cy < blockSize; cy++) {
+          for (let cx = 0; cx < blockSize; cx++) {
+            let px = x + cx;
+            let py = y + cy;
+            
+            // Asegurarnos de no salirnos de los bordes de la imagen
+            if (px < canvas.width && py < canvas.height) {
+              let i = (py * canvas.width + px) * 4;
+              if (data[i + 3] > 128) { // Ignorar píxeles transparentes
+                sumR += data[i];
+                sumG += data[i + 1];
+                sumB += data[i + 2];
+                count++;
+              }
+            }
+          }
+        }
+
+        if (count === 0) continue; // Si el área está vacía, saltar
+
+        // Calculamos el color promedio del área
+        const targetR = Math.round(sumR / count);
+        const targetG = Math.round(sumG / count);
+        const targetB = Math.round(sumB / count);
+        // -----------------------------------------------------------
 
         let minDistance = Infinity;
         let chosenBlock = dynamicPalette[0];
 
+        // Buscamos el bloque en nuestra paleta que más se parezca al promedio calculado
         for (let block of dynamicPalette) {
           let distance = Math.pow(targetR - block.r, 2) + Math.pow(targetG - block.g, 2) + Math.pow(targetB - block.b, 2);
           if (distance < minDistance) {
@@ -228,11 +252,9 @@
       }
     }
     
-    // Enable the download button once the conversion is done
     downloadBtn.disabled = false;
   }
 
-  // DOWNLOAD FUNCTIONALITY
   downloadBtn.addEventListener('click', function() {
     const link = document.createElement('a');
     link.download = 'pixel_art.png';
